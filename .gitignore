@@ -1,0 +1,12 @@
+build/
+.build/
+.swiftpm/
+DerivedData/
+*.app/
+*.dSYM/
+*.dmg
+*.zip
+*.log
+logs/
+state.json
+.DS_Store
