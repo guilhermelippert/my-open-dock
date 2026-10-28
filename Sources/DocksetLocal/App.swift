@@ -328,12 +328,14 @@ final class DockPanelController {
         case .left: edge = mouse.x <= screen.minX + 5 && mouse.y >= screen.minY && mouse.y <= screen.maxY
         case .right: edge = mouse.x >= screen.maxX - 5 && mouse.y >= screen.minY && mouse.y <= screen.maxY
         }
-        if edge || (panel.isVisible && panel.frame.insetBy(dx: -12, dy: -20).contains(mouse)) { lastHover = Date() }
+        // The bar stays while the pointer is over it or within a small margin around it.
+        let overBar = panel.isVisible && panel.frame.insetBy(dx: -16, dy: -16).contains(mouse)
+        if edge || overBar { lastHover = Date() }
         let hasPopover = NSApp.windows.contains {
             $0.isVisible && $0 !== panel &&
             (String(describing: type(of: $0)).contains("Popover") || $0.level.rawValue >= NSWindow.Level.popUpMenu.rawValue)
         }
-        if edge || hasPopover || Date() < forceVisibleUntil || Date().timeIntervalSince(lastHover) < store.preferences.revealDuration { show() }
+        if edge || overBar || hasPopover || Date() < forceVisibleUntil || Date().timeIntervalSince(lastHover) < store.preferences.revealDuration { show() }
         else { hide() }
     }
 }
