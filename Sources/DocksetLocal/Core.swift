@@ -89,14 +89,16 @@ struct DockPreferences: Codable, Equatable {
     var launchAtLogin: Bool = false
     var opacity: Double = 0.92
     var dockScale: Double = 1
+    /// Seconds the bar takes to fade in or out. Zero is instant.
+    var revealDuration: Double = 0.2
 
     private enum CodingKeys: String, CodingKey {
-        case edge, iconSize, autoHide, showRunningApps, showDock, launchAtLogin, opacity, dockScale
+        case edge, iconSize, autoHide, showRunningApps, showDock, launchAtLogin, opacity, dockScale, revealDuration
     }
 
     init(edge: DockEdge = .bottom, iconSize: Double = 48, autoHide: Bool = false,
          showRunningApps: Bool = true, showDock: Bool = true, launchAtLogin: Bool = false,
-         opacity: Double = 0.92, dockScale: Double = 1) {
+         opacity: Double = 0.92, dockScale: Double = 1, revealDuration: Double = 0.2) {
         self.edge = edge
         self.iconSize = iconSize
         self.autoHide = autoHide
@@ -105,6 +107,7 @@ struct DockPreferences: Codable, Equatable {
         self.launchAtLogin = launchAtLogin
         self.opacity = opacity
         self.dockScale = dockScale
+        self.revealDuration = revealDuration
     }
 
     init(from decoder: Decoder) throws {
@@ -117,6 +120,7 @@ struct DockPreferences: Codable, Equatable {
         launchAtLogin = try values.decodeIfPresent(Bool.self, forKey: .launchAtLogin) ?? false
         opacity = try values.decodeIfPresent(Double.self, forKey: .opacity) ?? 0.92
         dockScale = try values.decodeIfPresent(Double.self, forKey: .dockScale) ?? 1
+        revealDuration = min(max(try values.decodeIfPresent(Double.self, forKey: .revealDuration) ?? 0.2, 0), 1)
     }
 }
 

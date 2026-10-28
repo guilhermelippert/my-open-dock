@@ -13,7 +13,7 @@ struct ManagerView: View {
     @ManagerState private var pendingNativeLayout: NativeDockLayout?
     @ManagerState private var dropTarget = false
 
-    private let accent = Color(red: 0.53, green: 0.40, blue: 0.91)
+    private let accent = Color.accentColor
 
     var body: some View {
         HStack(spacing: 0) {
@@ -84,8 +84,8 @@ struct ManagerView: View {
                     .frame(width: 43, height: 43)
                     .background(LinearGradient(colors: [accent, accent.opacity(0.65)], startPoint: .topLeading, endPoint: .bottomTrailing), in: RoundedRectangle(cornerRadius: 12))
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Dockset").font(.system(size: 20, weight: .bold))
-                    Text("LOCAL").font(.system(size: 9, weight: .semibold, design: .rounded)).tracking(2.5).foregroundStyle(.secondary)
+                    Text("My Open").font(.system(size: 20, weight: .bold))
+                    Text("DOCK").font(.system(size: 9, weight: .semibold, design: .rounded)).tracking(2.5).foregroundStyle(.secondary)
                 }
             }
             .padding(.horizontal, 22)
@@ -338,6 +338,22 @@ struct ManagerView: View {
                     Text("A barra desaparece quando você afasta o ponteiro e reaparece ao levá-lo à borda da tela.")
                         .font(.system(size: 11)).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
+                    HStack {
+                        Text("Animação ao aparecer")
+                        Spacer()
+                        HStack {
+                            Slider(value: $store.preferences.revealDuration, in: 0...1, step: 0.05)
+                                .frame(width: 210)
+                                .accessibilityLabel("Duração da animação ao aparecer")
+                                .accessibilityValue(store.preferences.revealDuration == 0 ? "Instantâneo" : "\(Int((store.preferences.revealDuration * 1000).rounded())) milissegundos")
+                            Text(store.preferences.revealDuration == 0 ? "0 s" : String(format: "%.2f s", store.preferences.revealDuration))
+                                .font(.system(size: 11, design: .monospaced)).frame(width: 45)
+                        }
+                        .accessibilityElement(children: .contain)
+                    }
+                    .accessibilityElement(children: .contain)
+                    Text("Use 0 para a barra aparecer e sumir na hora, sem animação.")
+                        .font(.system(size: 11)).foregroundStyle(.secondary)
                     Toggle("Mostrar aplicativos em execução", isOn: $store.preferences.showRunningApps)
                     Toggle("Abrir ao iniciar sessão", isOn: $store.preferences.launchAtLogin)
                 }
@@ -450,7 +466,7 @@ struct ManagerView: View {
     private func exportBackup() {
         let panel = NSSavePanel()
         panel.title = "Exportar seus perfis"
-        panel.nameFieldStringValue = "Dockset Local.json"
+        panel.nameFieldStringValue = "My Open Dock.json"
         panel.allowedContentTypes = [.json]
         if panel.runModal() == .OK, let url = panel.url {
             do { try store.exportState(to: url) } catch { store.lastError = error.localizedDescription }
@@ -576,12 +592,12 @@ private struct ManagerItemIcon: View {
                 Image(nsImage: NSWorkspace.shared.icon(forFile: item.target)).resizable().interpolation(.high).scaledToFit()
             case .widget:
                 Image(systemName: WidgetKind(rawValue: item.target)?.symbol ?? "square.grid.2x2")
-                    .font(.system(size: 23)).foregroundStyle(.purple).frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(.purple.opacity(0.09), in: RoundedRectangle(cornerRadius: 9))
+                    .font(.system(size: 23)).foregroundStyle(Color.accentColor).frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color.accentColor.opacity(0.09), in: RoundedRectangle(cornerRadius: 9))
             case .link:
                 Image(systemName: "globe").font(.system(size: 27)).foregroundStyle(.blue).frame(maxWidth: .infinity, maxHeight: .infinity)
             case .shortcut:
-                Image(systemName: "command.square.fill").font(.system(size: 29)).foregroundStyle(.purple).frame(maxWidth: .infinity, maxHeight: .infinity)
+                Image(systemName: "command.square.fill").font(.system(size: 29)).foregroundStyle(Color.accentColor).frame(maxWidth: .infinity, maxHeight: .infinity)
             case .spacer:
                 Image(systemName: "rectangle.split.3x1").font(.system(size: 23)).foregroundStyle(.secondary).frame(maxWidth: .infinity, maxHeight: .infinity)
             }

@@ -6,7 +6,7 @@ import Darwin
 
 private typealias WidgetViewState<Value> = SwiftUI.State<Value>
 
-private let widgetAccent = Color(red: 0.48, green: 0.39, blue: 0.91)
+private let widgetAccent = Color.accentColor
 
 /// The dock and library share these compact, independently interactive widgets.
 @MainActor

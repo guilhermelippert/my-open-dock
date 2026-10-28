@@ -45,12 +45,14 @@ struct CoreSmoke {
         store.preferences.edge = .right
         store.preferences.showDock = false
         store.preferences.dockScale = 1.25
+        store.preferences.revealDuration = 0
 
         let reloaded = DockStore(dataDirectory: sourceDirectory)
         try check(reloaded.selectedProfileID == testID, "Selected profile did not persist")
         try check(reloaded.currentProfile?.items == store.currentProfile?.items, "Items did not persist")
         try check(reloaded.preferences.iconSize == 60 && reloaded.preferences.edge == .right, "Preferences did not persist")
         try check(reloaded.preferences.dockScale == 1.25 && !reloaded.preferences.showDock, "Scale did not persist or re-enabled the Dock")
+        try check(reloaded.preferences.revealDuration == 0, "Instant reveal did not persist")
 
         store.duplicateProfile(testID)
         let copy = try require(store.currentProfile, "Missing duplicated profile")
@@ -114,6 +116,7 @@ struct CoreSmoke {
         legacy.removeValue(forKey: "widgetPreferences")
         var legacyPreferences = try require(legacy["preferences"] as? [String: Any], "Missing legacy preferences")
         legacyPreferences.removeValue(forKey: "dockScale")
+        legacyPreferences.removeValue(forKey: "revealDuration")
         legacy["preferences"] = legacyPreferences
         let legacyURL = directory.appendingPathComponent("legacy.json")
         try JSONSerialization.data(withJSONObject: legacy).write(to: legacyURL)
@@ -121,6 +124,7 @@ struct CoreSmoke {
         try restored.importState(from: legacyURL)
         try check(UserDefaults.standard.string(forKey: widgetPrefix + "note") == "Valor local em backup antigo", "Legacy import must preserve local widget values")
         try check(restored.preferences.dockScale == 1 && !restored.preferences.showDock, "Legacy scale migration changed the disabled Dock")
+        try check(restored.preferences.revealDuration == 0.2, "Legacy backup must get the default reveal animation")
 
         try testCorruptRecovery(directory: directory, validBackup: backup)
         try testLimits(directory: directory, validBackup: backup)
