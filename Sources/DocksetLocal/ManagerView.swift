@@ -352,7 +352,7 @@ struct ManagerView: View {
                         .accessibilityElement(children: .contain)
                     }
                     .accessibilityElement(children: .contain)
-                    Text("Use 0 para a barra aparecer e sumir na hora, sem animação.")
+                    Text("Vale para aparecer e para sumir. Use 0 para ser instantâneo.")
                         .font(.system(size: 11)).foregroundStyle(.secondary)
                     Toggle("Mostrar aplicativos em execução", isOn: $store.preferences.showRunningApps)
                     Toggle("Abrir ao iniciar sessão", isOn: $store.preferences.launchAtLogin)

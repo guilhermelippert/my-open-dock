@@ -325,7 +325,7 @@ final class DockPanelController {
             $0.isVisible && $0 !== panel &&
             (String(describing: type(of: $0)).contains("Popover") || $0.level.rawValue >= NSWindow.Level.popUpMenu.rawValue)
         }
-        if edge || hasPopover || Date() < forceVisibleUntil || Date().timeIntervalSince(lastHover) < 0.85 { show() }
+        if edge || hasPopover || Date() < forceVisibleUntil || Date().timeIntervalSince(lastHover) < store.preferences.revealDuration { show() }
         else { hide() }
     }
 }
