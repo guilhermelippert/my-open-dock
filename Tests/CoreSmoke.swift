@@ -126,6 +126,7 @@ struct CoreSmoke {
         try testLimits(directory: directory, validBackup: backup)
         try testLocalRestorePoint(directory: directory, validBackup: backup)
         try testScaleValidation(directory: directory, validBackup: backup)
+        try testNativeDockMatching(directory: directory)
 
         for profile in restored.profiles.dropFirst() { restored.deleteProfile(profile.id) }
         if let last = restored.profiles.first { restored.deleteProfile(last.id) }
@@ -133,7 +134,7 @@ struct CoreSmoke {
         restored.cycleProfile(-1)
         restored.cycleProfile(1)
         try check(restored.currentProfile != nil, "Profile cycle lost selection")
-        print("PASS: profile/item management, persistence, widget backup, corrupt recovery, mutation limits, machine-local restore point, scale migration and validation. Native Dock unchanged.")
+        print("PASS: profile/item management, persistence, widget backup, corrupt recovery, mutation limits, machine-local restore point, scale validation and native Dock matching. Native Dock unchanged.")
     }
 
     @MainActor
@@ -271,6 +272,72 @@ struct CoreSmoke {
             throw SmokeFailure(description: "Non-finite Dock scale was accepted")
         } catch is DecodingError {}
         try check(store.preferences == validPreferences, "Rejected non-finite scale changed preferences")
+    }
+
+    @MainActor
+    private static func testNativeDockMatching(directory: URL) throws {
+        let fixture: [String: Any] = [
+            "tilesize": 33.0, "orientation": "bottom", "autohide": true, "static-only": false,
+            "persistent-apps": [
+                ["tile-type": "file-tile", "tile-data": ["file-label": "Editor", "file-data": ["_CFURLString": "file:///Applications/Editor.app/", "_CFURLStringType": 2]]],
+                ["tile-type": "small-spacer-tile"],
+                ["tile-type": "file-tile", "tile-data": ["file-label": "My Browser", "file-data": ["_CFURLString": "/Applications/My Browser.app", "_CFURLStringType": 0]]],
+                ["tile-type": "file-tile", "tile-data": ["file-data": ["_CFURLString": "javascript:alert(1)"]]]
+            ],
+            "persistent-others": [
+                ["tile-type": "directory-tile", "tile-data": ["file-label": "Documents", "file-data": ["_CFURLString": "file:///tmp/DocksetDocuments/", "_CFURLStringType": 2]]],
+                ["tile-type": "url-tile", "tile-data": ["label": "Example", "url": ["_CFURLString": "https://example.com"]]],
+                ["tile-type": "url-tile", "tile-data": ["url": ["_CFURLString": "shortcuts://run-shortcut?name=untrusted"]]]
+            ]
+        ]
+        let config = try NativeDockConfiguration(preferences: fixture)
+        try check(config.items.map(\.name) == ["Finder", "Editor", "Espaço", "My Browser", "Documents", "Example", "Lixo"], "Native Dock item order or invalid-tile filtering is wrong")
+        try check(config.items.map(\.kind) == [.app, .app, .spacer, .app, .folder, .link, .folder], "Native Dock item kinds are wrong")
+        try check(config.items[3].target == "/Applications/My Browser.app", "Filesystem URL type zero lost spaces")
+        try check(config.iconSize == 33 && config.edge == .bottom && config.autoHide && config.showRunningApps, "Native Dock appearance or behavior was not read")
+        let store = DockStore(dataDirectory: directory.appendingPathComponent("match-native", isDirectory: true))
+        let initialProfiles = store.profiles
+        store.preferences.showDock = false
+        store.preferences.dockScale = 1.4
+        try store.matchMacDockConfiguration(config)
+        let matchedID = store.selectedProfileID
+        try check(store.profiles.count == initialProfiles.count + 1 && store.profiles.prefix(initialProfiles.count).elementsEqual(initialProfiles), "Matching replaced an existing profile")
+        try check(store.currentProfile?.name == "Meu Dock" && store.currentProfile?.items == config.items, "Matching did not select the native profile")
+        try check(store.preferences.iconSize == 33 && store.preferences.autoHide && store.preferences.showDock && store.preferences.dockScale == 1, "Matching did not apply native size and visibility")
+        try check(!store.hasOriginalNativeDock, "Matching must never apply native Dock changes")
+        try store.matchMacDockConfiguration(config)
+        try check(store.profiles.count == 4 && store.selectedProfileID == matchedID, "Repeated matching created duplicate profiles")
+        let reloaded = DockStore(dataDirectory: store.dataDirectory)
+        try check(reloaded.currentProfile?.items == config.items && reloaded.preferences == store.preferences, "Native matching did not persist")
+
+        var left = fixture
+        left["orientation"] = "left"; left["tilesize"] = 16; left["autohide"] = false; left["static-only"] = true
+        let leftConfig = try NativeDockConfiguration(preferences: left)
+        try store.matchMacDockConfiguration(leftConfig)
+        try check(store.preferences.edge == .left && store.preferences.iconSize == 16 && !store.preferences.autoHide && !store.preferences.showRunningApps, "Left/static native Dock settings were lost")
+        try check(DockStore(dataDirectory: store.dataDirectory).preferences.iconSize == 16, "Small native Dock size became unreadable")
+        left["orientation"] = "right"; left["tilesize"] = 128
+        try store.matchMacDockConfiguration(NativeDockConfiguration(preferences: left))
+        try check(DockStore(dataDirectory: store.dataDirectory).preferences.iconSize == 128, "Large native Dock size became unreadable")
+        for invalidSize in [15.0, 129.0, Double.nan] {
+            var invalid = fixture; invalid["tilesize"] = invalidSize
+            do { _ = try NativeDockConfiguration(preferences: invalid); throw SmokeFailure(description: "Invalid native icon size was accepted") }
+            catch is DockStoreError {}
+        }
+        var invalid = fixture; invalid["persistent-apps"] = "not an array"
+        do { _ = try NativeDockConfiguration(preferences: invalid); throw SmokeFailure(description: "Malformed native Dock entries were accepted") }
+        catch is DockStoreError {}
+        try check(NativeDockConfiguration(preferences: [:]).items.map(\.name) == ["Finder", "Lixo"], "An empty native Dock lost its fixed items")
+
+        let blockedDirectory = directory.appendingPathComponent("match-blocked", isDirectory: true)
+        let blocked = DockStore(dataDirectory: blockedDirectory)
+        let previous = (blocked.profiles, blocked.selectedProfileID, blocked.preferences)
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: blockedDirectory.path)
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: blockedDirectory.path) }
+        do { try blocked.matchMacDockConfiguration(config); throw SmokeFailure(description: "Matching succeeded without persistence permission") }
+        catch is CocoaError {}
+        try check(blocked.profiles == previous.0 && blocked.selectedProfileID == previous.1 && blocked.preferences == previous.2, "Failed matching changed the live configuration")
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: blockedDirectory.path)
     }
 
     private static func check(_ condition: @autoclosure () throws -> Bool, _ message: String) throws {

@@ -120,6 +120,80 @@ struct DockPreferences: Codable, Equatable {
     }
 }
 
+/// A read-only translation of Apple's Dock preferences into the custom Dock model.
+struct NativeDockConfiguration {
+    let items: [DockItem]
+    let iconSize: Double
+    let edge: DockEdge
+    let autoHide: Bool
+    let showRunningApps: Bool
+
+    init(preferences: [String: Any]) throws {
+        guard let apps = (preferences["persistent-apps"] ?? []) as? [[String: Any]],
+              let others = (preferences["persistent-others"] ?? []) as? [[String: Any]] else {
+            throw DockStoreError.invalid("Não foi possível ler os itens do Dock do macOS.")
+        }
+        let size = (preferences["tilesize"] as? NSNumber)?.doubleValue ?? 48
+        guard size.isFinite, (16...128).contains(size) else {
+            throw DockStoreError.invalid("O tamanho do Dock do macOS está fora do intervalo de 16 a 128 pixels.")
+        }
+        iconSize = size
+        edge = DockEdge(rawValue: preferences["orientation"] as? String ?? "bottom") ?? .bottom
+        autoHide = (preferences["autohide"] as? NSNumber)?.boolValue ?? false
+        showRunningApps = !((preferences["static-only"] as? NSNumber)?.boolValue ?? false)
+
+        let finder = "/System/Library/CoreServices/Finder.app"
+        let trash = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".Trash").path
+        var result = [DockItem(name: "Finder", kind: .app, target: finder)]
+        for entry in apps + others {
+            guard let item = Self.item(from: entry), item.target != finder, item.target != trash else { continue }
+            result.append(item)
+        }
+        result.append(DockItem(name: "Lixo", kind: .folder, target: trash))
+        guard result.count <= 500 else { throw DockStoreError.invalid("O Dock do macOS tem mais de 500 itens.") }
+        items = result
+    }
+
+    private static func item(from entry: [String: Any]) -> DockItem? {
+        guard let type = entry["tile-type"] as? String else { return nil }
+        if ["spacer-tile", "small-spacer-tile", "flex-spacer-tile"].contains(type) {
+            return DockItem(name: "Espaço", kind: .spacer, target: "")
+        }
+        guard let tile = entry["tile-data"] as? [String: Any] else { return nil }
+        if type == "url-tile" {
+            guard let raw = (tile["url"] as? [String: Any])?["_CFURLString"] as? String,
+                  raw.count <= 8192, let url = URL(string: raw),
+                  ["http", "https"].contains(url.scheme?.lowercased() ?? ""), url.host?.isEmpty == false else { return nil }
+            return DockItem(name: label(tile, fallback: url.host ?? "Link"), kind: .link, target: url.absoluteString)
+        }
+        guard ["file-tile", "directory-tile"].contains(type), let url = fileURL(tile), url.path.count <= 8192 else { return nil }
+        let kind: DockItemKind
+        if url.pathExtension.caseInsensitiveCompare("app") == .orderedSame { kind = .app }
+        else if type == "directory-tile" || (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true { kind = .folder }
+        else { kind = .file }
+        return DockItem(name: label(tile, fallback: url.deletingPathExtension().lastPathComponent), kind: kind, target: url.standardizedFileURL.path)
+    }
+
+    private static func label(_ tile: [String: Any], fallback: String) -> String {
+        let label = ((tile["file-label"] as? String) ?? (tile["label"] as? String) ?? fallback).trimmingCharacters(in: .whitespacesAndNewlines)
+        return String((label.isEmpty ? fallback : label).prefix(512))
+    }
+
+    private static func fileURL(_ tile: [String: Any]) -> URL? {
+        if let file = tile["file-data"] as? [String: Any], let raw = file["_CFURLString"] as? String {
+            if raw.hasPrefix("/") { return URL(fileURLWithPath: raw) }
+            if let url = URL(string: raw), url.isFileURL { return url }
+        }
+        if let bookmark = tile["book"] as? Data {
+            var stale = false
+            if let url = try? URL(resolvingBookmarkData: bookmark, options: [.withoutUI, .withoutMounting], relativeTo: nil, bookmarkDataIsStale: &stale), url.isFileURL {
+                return url
+            }
+        }
+        return nil
+    }
+}
+
 struct NativeDockLayout: Identifiable, Codable {
     var id: UUID = UUID()
     var name: String
@@ -346,6 +420,41 @@ final class DockStore: ObservableObject {
         NotificationCenter.default.post(name: Notification.Name("DocksetLocal.widgetsImported"), object: nil)
     }
 
+    func matchCurrentMacDock() {
+        do { try matchMacDockConfiguration(NativeDockConfiguration(preferences: NativeDockBridge.readPreferences())) }
+        catch { lastError = error.localizedDescription }
+    }
+
+    func matchMacDockConfiguration(_ configuration: NativeDockConfiguration) throws {
+        try requirePersistence()
+        let existing = profiles.firstIndex { $0.name == "Meu Dock" }
+        guard existing != nil || profiles.count < Self.profileLimit else {
+            throw DockStoreError.invalid("Você atingiu o limite de 100 perfis. Remova um perfil antes de copiar o Dock do macOS.")
+        }
+        guard configuration.items.count <= Self.itemLimit else {
+            throw DockStoreError.invalid("O Dock do macOS tem mais de 500 itens.")
+        }
+        for item in configuration.items { try Self.validateItemFields(item) }
+        let before = (profiles, selectedProfileID, preferences)
+        isLoading = true
+        defer { isLoading = false }
+        let profile = DockProfile(id: existing.map { profiles[$0].id } ?? UUID(), name: "Meu Dock", symbol: "rectangle.bottomthird.inset.filled", items: configuration.items)
+        if let existing { profiles[existing] = profile }
+        else { profiles.append(profile) }
+        selectedProfileID = profile.id
+        preferences.edge = configuration.edge
+        preferences.iconSize = configuration.iconSize
+        preferences.autoHide = configuration.autoHide
+        preferences.showRunningApps = configuration.showRunningApps
+        preferences.dockScale = 1
+        preferences.showDock = true
+        do { try save(); lastError = nil }
+        catch {
+            profiles = before.0; selectedProfileID = before.1; preferences = before.2
+            throw error
+        }
+    }
+
     func saveNativeLayout(name: String) {
         do {
             let payload = try NativeDockBridge.capture()
@@ -470,7 +579,7 @@ final class DockStore: ObservableObject {
                 try validateItemFields(item)
             }
         }
-        guard state.preferences.iconSize.isFinite, (28...80).contains(state.preferences.iconSize),
+        guard state.preferences.iconSize.isFinite, (16...128).contains(state.preferences.iconSize),
               state.preferences.opacity.isFinite, (0.2...1).contains(state.preferences.opacity),
               state.preferences.dockScale.isFinite, (0.6...1.6).contains(state.preferences.dockScale) else {
             throw DockStoreError.invalid("O backup contém preferências de aparência inválidas.")
@@ -608,12 +717,17 @@ private enum NativeDockBridge {
     private static let keys = ["persistent-apps", "persistent-others"]
 
     static func capture() throws -> Data {
+        let preferences = try readPreferences()
+        let snapshot: [String: Any] = [keys[0]: preferences[keys[0]] ?? [], keys[1]: preferences[keys[1]] ?? []]
+        return try PropertyListSerialization.data(fromPropertyList: snapshot, format: .binary, options: 0)
+    }
+
+    static func readPreferences() throws -> [String: Any] {
         let output = try run("/usr/bin/defaults", arguments: ["export", domain, "-"])
         guard let preferences = try PropertyListSerialization.propertyList(from: output, options: [], format: nil) as? [String: Any] else {
             throw DockStoreError.command("Não foi possível ler o Dock do macOS.")
         }
-        let snapshot: [String: Any] = [keys[0]: preferences[keys[0]] ?? [], keys[1]: preferences[keys[1]] ?? []]
-        return try PropertyListSerialization.data(fromPropertyList: snapshot, format: .binary, options: 0)
+        return preferences
     }
 
     static func dictionary(from data: Data) throws -> [String: Any] {

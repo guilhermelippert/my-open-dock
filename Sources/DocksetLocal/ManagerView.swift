@@ -274,6 +274,13 @@ struct ManagerView: View {
         VStack(alignment: .leading, spacing: 24) {
             sectionHeading("Encontre seu lugar na tela", subtitle: "A aparência e a posição valem para todos os seus perfis.")
             Form {
+                Section("Configuração do macOS") {
+                    Button("Usar configuração do meu Dock") { store.matchCurrentMacDock() }
+                        .accessibilityLabel("Usar configuração do meu Dock")
+                    Text("Copia os itens fixados, o tamanho, a posição e a ocultação automática do Dock do macOS. Seus perfis são preservados.")
+                        .font(.system(size: 11)).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 Section("Barra personalizada") {
                     Toggle("Mostrar o Dock personalizado", isOn: $store.preferences.showDock)
                     Picker("Posição", selection: $store.preferences.edge) {
@@ -303,7 +310,7 @@ struct ManagerView: View {
                         Text("Tamanho dos ícones")
                         Spacer()
                         HStack {
-                            Slider(value: $store.preferences.iconSize, in: 32...72, step: 2)
+                            Slider(value: $store.preferences.iconSize, in: 16...128, step: 1)
                                 .frame(width: 210)
                                 .accessibilityLabel("Tamanho dos ícones")
                                 .accessibilityValue("\(Int(store.preferences.iconSize)) pixels")
@@ -328,12 +335,15 @@ struct ManagerView: View {
                 }
                 Section("Comportamento") {
                     Toggle("Ocultar automaticamente", isOn: $store.preferences.autoHide)
+                    Text("A barra desaparece quando você afasta o ponteiro e reaparece ao levá-lo à borda da tela.")
+                        .font(.system(size: 11)).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                     Toggle("Mostrar aplicativos em execução", isOn: $store.preferences.showRunningApps)
                     Toggle("Abrir ao iniciar sessão", isOn: $store.preferences.launchAtLogin)
                 }
             }
             .formStyle(.grouped)
-            .frame(minHeight: 460)
+            .frame(minHeight: 590)
             Label("A barra personalizada funciona ao lado do Dock da Apple.", systemImage: "info.circle")
                 .font(.system(size: 11)).foregroundStyle(.secondary)
         }

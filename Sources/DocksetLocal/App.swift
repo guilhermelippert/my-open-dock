@@ -39,6 +39,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             NSApp.terminate(nil)
             return
         }
+        if CommandLine.arguments.contains("--match-system-dock") { store.matchCurrentMacDock() }
         loginSetting = store.preferences.launchAtLogin
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         statusItem?.button?.image = NSImage(systemSymbolName: "rectangle.bottomthird.inset.filled", accessibilityDescription: "Dockset Local")
@@ -201,7 +202,7 @@ final class DockPanelController {
         self.manage = manage
         panel = DockPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         panel.isFloatingPanel = true
-        panel.level = .floating
+        panel.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.dockWindow)) + 1)
         panel.backgroundColor = .clear
         panel.isOpaque = false
         panel.hasShadow = true
@@ -240,34 +241,28 @@ final class DockPanelController {
     private func runningApps() -> [DockItem] {
         guard store.preferences.showRunningApps else { return [] }
         let pinned = Set(store.currentProfile?.items.filter { $0.kind == .app }.map(\.target) ?? [])
-        return NSWorkspace.shared.runningApplications.compactMap { app in
+        return NSWorkspace.shared.runningApplications.sorted {
+            ($0.launchDate ?? .distantPast) < ($1.launchDate ?? .distantPast)
+        }.compactMap { app in
             guard app.activationPolicy == .regular, app.bundleIdentifier != Bundle.main.bundleIdentifier,
                   let url = app.bundleURL, !pinned.contains(url.path) else { return nil }
             return DockItem(name: app.localizedName ?? url.deletingPathExtension().lastPathComponent, kind: .app, target: url.path)
-        }.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
-    }
-
-    private func width(for item: DockItem) -> CGFloat {
-        if item.kind == .widget { return 168 }
-        if item.kind == .spacer { return 16 }
-        return store.preferences.iconSize + 12
+        }
     }
 
     private func refresh() {
         let extras = runningApps()
-        let items = (store.currentProfile?.items ?? []) + extras
-        let vertical = store.preferences.edge != .bottom
+        let items = store.currentProfile?.items ?? []
         let area = currentScreen.visibleFrame
-        let widgetHeight = max(68, store.preferences.iconSize + 12)
-        let natural = items.reduce(CGFloat(72)) { $0 + (vertical ? ($1.kind == .spacer ? 16 : widgetHeight + 8) : width(for: $1) + 8) }
-        let scale = store.preferences.dockScale
-        let width: CGFloat = vertical ? (items.contains { $0.kind == .widget } ? 194 : store.preferences.iconSize + 36) * scale : min(natural * scale, area.width - 32)
-        let height: CGFloat = vertical ? min(natural * scale, area.height - 48) : max(90, store.preferences.iconSize + 32) * scale
+        let natural = DockBarSizing.size(pinned: items, running: extras, iconSize: store.preferences.iconSize,
+                                        edge: store.preferences.edge, scale: store.preferences.dockScale)
+        let width = min(natural.width, area.width - 16)
+        let height = min(natural.height, area.height - 16)
         let origin: NSPoint
         switch store.preferences.edge {
-        case .bottom: origin = NSPoint(x: area.midX - width / 2, y: area.minY + 12)
-        case .left: origin = NSPoint(x: area.minX + 12, y: area.midY - height / 2)
-        case .right: origin = NSPoint(x: area.maxX - width - 12, y: area.midY - height / 2)
+        case .bottom: origin = NSPoint(x: area.midX - width / 2, y: area.minY + 4)
+        case .left: origin = NSPoint(x: area.minX + 4, y: area.midY - height / 2)
+        case .right: origin = NSPoint(x: area.maxX - width - 4, y: area.midY - height / 2)
         }
         let targets = extras.map(\.target)
         if hostingView == nil || targets != displayedRunningTargets {
@@ -296,7 +291,10 @@ final class DockPanelController {
         case .right: edge = mouse.x >= screen.maxX - 5 && mouse.y >= screen.minY && mouse.y <= screen.maxY
         }
         if edge || (panel.isVisible && panel.frame.insetBy(dx: -12, dy: -20).contains(mouse)) { lastHover = Date() }
-        let hasPopover = NSApp.windows.contains { $0.isVisible && $0 !== panel && String(describing: type(of: $0)).contains("Popover") }
+        let hasPopover = NSApp.windows.contains {
+            $0.isVisible && $0 !== panel &&
+            (String(describing: type(of: $0)).contains("Popover") || $0.level.rawValue >= NSWindow.Level.popUpMenu.rawValue)
+        }
         if edge || hasPopover || Date() < forceVisibleUntil || Date().timeIntervalSince(lastHover) < 0.85 { panel.orderFrontRegardless() }
         else { panel.orderOut(nil) }
     }
@@ -308,6 +306,7 @@ struct DockBarView: View {
     let manage: () -> Void
     let resizeStateChanged: (Bool) -> Void
     private var vertical: Bool { store.preferences.edge != .bottom }
+    private var sections: (apps: [DockItem], others: [DockItem]) { DockBarSizing.sections(store.currentProfile?.items ?? []) }
 
     var body: some View {
         GeometryReader { geometry in
@@ -321,20 +320,22 @@ struct DockBarView: View {
     private var barContent: some View {
         AnyLayout(vertical ? AnyLayout(VStackLayout(spacing: 0)) : AnyLayout(HStackLayout(spacing: 0))) {
         ScrollView(vertical ? .vertical : .horizontal, showsIndicators: false) {
-            AnyLayout(vertical ? AnyLayout(VStackLayout(spacing: 8)) : AnyLayout(HStackLayout(spacing: 8))) {
+            AnyLayout(vertical ? AnyLayout(VStackLayout(spacing: DockBarSizing.spacing)) : AnyLayout(HStackLayout(spacing: DockBarSizing.spacing))) {
                 profileMenu
-                ForEach(store.currentProfile?.items ?? []) { item in dockItem(item) }
+                ForEach(sections.apps) { item in dockItem(item) }
                 if !running.isEmpty {
-                    Rectangle().fill(.primary.opacity(0.15)).frame(width: vertical ? 40 : 1, height: vertical ? 1 : 38).padding(4)
+                    sectionDivider
                     ForEach(running) { item in dockItem(item) }
                 }
+                if !sections.others.isEmpty && (!sections.apps.isEmpty || !running.isEmpty) { sectionDivider }
+                ForEach(sections.others) { item in dockItem(item) }
             }
-            .padding(10)
+            .padding(DockBarSizing.padding)
         }
         DockResizeHandle(edge: store.preferences.edge, scale: store.preferences.dockScale, onChange: { scale in
             store.preferences.dockScale = scale
         }, onDragStateChanged: resizeStateChanged)
-        .frame(width: vertical ? nil : 18, height: vertical ? 18 : nil)
+        .frame(width: vertical ? nil : DockBarSizing.handle, height: vertical ? DockBarSizing.handle : nil)
         .frame(maxWidth: vertical ? .infinity : nil, maxHeight: vertical ? nil : .infinity)
         }
         .background {
@@ -352,6 +353,12 @@ struct DockBarView: View {
         }
     }
 
+    private var sectionDivider: some View {
+        Rectangle().fill(.primary.opacity(0.15))
+            .frame(width: vertical ? min(store.preferences.iconSize, 40) : 1,
+                   height: vertical ? 1 : min(store.preferences.iconSize, 38)).padding(4)
+    }
+
     private var profileMenu: some View {
         Menu {
             ForEach(Array(store.profiles.enumerated()), id: \.element.id) { index, profile in
@@ -362,11 +369,13 @@ struct DockBarView: View {
             Divider()
             Button("Gerenciar Docks…", action: manage)
             Button("Próximo perfil") { store.cycleProfile(1) }
+            Toggle("Ocultar automaticamente", isOn: $store.preferences.autoHide)
             Button("Ocultar barra") { store.preferences.showDock = false }
         } label: {
             Image(systemName: store.currentProfile?.symbol ?? "square.stack.3d.up.fill")
-                .font(.system(size: 19, weight: .semibold)).foregroundStyle(Color.purple)
-                .frame(width: 34, height: 48)
+                .font(.system(size: min(19, store.preferences.iconSize * 0.48), weight: .semibold)).foregroundStyle(Color.purple)
+                .frame(width: vertical ? store.preferences.iconSize + 6 : 24,
+                       height: vertical ? 24 : store.preferences.iconSize + 7)
         }
         .menuStyle(.borderlessButton).menuIndicator(.hidden)
         .help("\(store.currentProfile?.name ?? "Perfis") • Trocar perfil")
@@ -421,6 +430,9 @@ private struct DockLaunchButton: View {
     @AppViewState private var hovered = false
     private var isRunning: Bool { item.kind == .app && NSWorkspace.shared.runningApplications.contains { $0.bundleURL?.path == item.target } }
     private var icon: NSImage {
+        if item.kind == .folder && item.target == FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".Trash").path {
+            return NSImage(systemSymbolName: "trash", accessibilityDescription: "Lixo") ?? NSImage()
+        }
         if [.app, .folder, .file].contains(item.kind) { return NSWorkspace.shared.icon(forFile: item.target) }
         return NSImage(systemSymbolName: item.kind == .shortcut ? "square.stack.3d.up.fill" : "globe", accessibilityDescription: item.name) ?? NSImage()
     }
@@ -428,9 +440,9 @@ private struct DockLaunchButton: View {
         Button(action: launch) {
             VStack(spacing: 3) {
                 Image(nsImage: icon).resizable().aspectRatio(contentMode: .fit).frame(width: size, height: size)
-                    .scaleEffect(hovered ? 1.10 : 1)
+                    .opacity(hovered ? 0.8 : 1)
                 Circle().fill(isRunning ? Color.primary.opacity(0.7) : .clear).frame(width: 4, height: 4)
-            }.frame(width: size + 12, height: max(68, size + 12))
+            }.frame(width: size + 6, height: size + 7)
         }
         .buttonStyle(.plain).help(item.name).accessibilityLabel("Abrir \(item.name)")
         .onHover { hovered = $0 }.animation(.easeOut(duration: 0.15), value: hovered)
