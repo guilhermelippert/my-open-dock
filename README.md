@@ -8,7 +8,7 @@ O código é aberto sob a [licença MIT](LICENSE). Você pode baixar, copiar, mo
 
 ## Baixar
 
-Abra a página de [Releases](https://github.com/guilhermelippert/dockset-local/releases/latest) e baixe `Dockset-Local-1.0.0-macOS-arm64.zip`. Extraia o arquivo e mova `Dockset Local.app` para a pasta Aplicativos. O pacote é para Macs com Apple Silicon e macOS 14 ou superior.
+Abra a página de [Releases](https://github.com/guilhermelippert/dockset-local/releases/latest) e baixe `Dockset-Local-1.1.0-macOS-arm64.zip`. Extraia o arquivo e mova `Dockset Local.app` para a pasta Aplicativos. O pacote é para Macs com Apple Silicon e macOS 14 ou superior.
 
 O aplicativo usa assinatura local ad hoc, sem Developer ID ou notarização da Apple. Se o macOS bloquear a abertura, confira a origem do download e use a opção de abertura em **Ajustes do Sistema > Privacidade e Segurança**.
 
@@ -61,6 +61,10 @@ O ícone do aplicativo fica na barra de menus. Abra **Gerenciar Docks…** para 
 
 Em **Aparência**, você pode ocultar a barra e escolher se o aplicativo deve iniciar com a sessão. O início automático depende do registro permitido pelo macOS.
 
+**Usar configuração do meu Dock** cria ou atualiza o perfil **Meu Dock** com os apps e pastas fixados no Dock da Apple, na mesma ordem, e copia tamanho dos ícones, posição e ocultação automática. Seus outros perfis continuam disponíveis. O Dock da Apple é apenas consultado.
+
+Com **Ocultar automaticamente** ligado, a barra desaparece ao afastar o ponteiro e reaparece ao encostar na borda da tela. A opção também está no menu de perfis da própria barra.
+
 ## Dados e backups
 
 Os perfis ficam em `~/Library/Application Support/DocksetLocal/state.json`. Notas e preferências dos widgets usam o domínio local `local.gui.DocksetLocal` e entram nos backups exportados.
@@ -87,6 +91,15 @@ xcrun swiftc -swift-version 5 -target arm64-apple-macosx14.0 \
   Sources/DocksetLocal/Core.swift Sources/DocksetLocal/ResizeHandle.swift \
   Tests/ResizeSmoke.swift -o /tmp/dockset-resize-smoke
 /tmp/dockset-resize-smoke
+```
+
+O layout compacto e a separação entre apps e pastas também são verificados:
+
+```sh
+xcrun swiftc -swift-version 5 -target arm64-apple-macosx14.0 \
+  Sources/DocksetLocal/Core.swift Sources/DocksetLocal/DockBarSizing.swift \
+  Tests/DockLayoutSmoke.swift -o /tmp/dockset-layout-smoke
+/tmp/dockset-layout-smoke
 ```
 
 ## Limites atuais
