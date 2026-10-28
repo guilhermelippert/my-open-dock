@@ -353,7 +353,11 @@ final class DockStore: ObservableObject {
             let name = values?.localizedName ?? url.deletingPathExtension().lastPathComponent
             additions.append(DockItem(name: name.replacingOccurrences(of: ".app", with: ""), kind: kind, target: url.path))
         }
-        profiles[index].items.append(contentsOf: additions)
+        // Apps join the end of the pinned apps, before folders and files, like the macOS Dock.
+        let items = profiles[index].items
+        let split = items.firstIndex { $0.kind != .app && $0.kind != .spacer } ?? items.endIndex
+        profiles[index].items.insert(contentsOf: additions.filter { $0.kind == .app }, at: split)
+        profiles[index].items.append(contentsOf: additions.filter { $0.kind != .app })
     }
 
     func addLink(name: String, url: String) {

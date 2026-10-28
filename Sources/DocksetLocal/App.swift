@@ -449,7 +449,11 @@ struct DockBarView: View {
                     if item.kind == .app || item.kind == .folder || item.kind == .file {
                         Button("Mostrar no Finder") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: item.target)]) }
                     }
-                    if !running.contains(where: { $0.id == item.id }) { Button("Remover do Dock") { store.removeItem(item.id) } }
+                    if running.contains(where: { $0.id == item.id }) {
+                        Button("Manter no Dock") { store.addItems([URL(fileURLWithPath: item.target)]) }
+                    } else {
+                        Button("Remover do Dock") { store.removeItem(item.id) }
+                    }
                     Button("Gerenciar Docks…", action: manage)
                 }
         }
