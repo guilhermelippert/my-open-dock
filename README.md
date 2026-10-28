@@ -1,14 +1,18 @@
-# Dockset Local
+# My Open Dock
 
-An independent, open-source macOS dock built with SwiftUI and AppKit. Create profiles, launch apps and keep small widgets close, without an account or a server.
+Um Dock alternativo para macOS, feito em SwiftUI e AppKit, com perfis, widgets e ocultação automática. Sem conta e sem servidor.
 
-App nativo para macOS, inspirado na experiência do [Dockset](https://dockset.app/). Este projeto é independente, não tem afiliação com o Dockset e não reproduz todas as integrações do produto original.
+## Sobre este projeto
 
-O código é aberto sob a [licença MIT](LICENSE). Você pode baixar, copiar, modificar e distribuir, respeitando os termos da licença.
+Fiz este app para mim, para usar no meu Mac. Ele foi inspirado no [Dockset](https://dockset.app/), mas é independente e não tem afiliação com ele.
+
+O código está aberto para quem quiser usar como base: faça um fork e adapte do seu jeito. Issues e pull requests são bem-vindos, mas o projeto não é mantido ativamente. Pode demorar para eu responder, ou eu posso não responder.
+
+O código é aberto sob a [licença MIT](LICENSE).
 
 ## Baixar
 
-Abra a página de [Releases](https://github.com/guilhermelippert/dockset-local/releases/latest) e baixe `Dockset-Local-1.1.0-macOS-arm64.zip`. Extraia o arquivo e mova `Dockset Local.app` para a pasta Aplicativos. O pacote é para Macs com Apple Silicon e macOS 14 ou superior.
+Abra a página de [Releases](https://github.com/guilhermelippert/my-open-dock/releases/latest), baixe o `.zip` mais recente, extraia e mova `My Open Dock.app` para a pasta Aplicativos. O pacote é para Macs com Apple Silicon e macOS 14 ou superior.
 
 O aplicativo usa assinatura local ad hoc, sem Developer ID ou notarização da Apple. Se o macOS bloquear a abertura, confira a origem do download e use a opção de abertura em **Ajustes do Sistema > Privacidade e Segurança**.
 
@@ -16,6 +20,8 @@ O aplicativo usa assinatura local ad hoc, sem Developer ID ou notarização da A
 
 - Perfis de Dock com aplicativos, arquivos, pastas, links, Atalhos do macOS e espaçadores.
 - Barra flutuante com itens fixados e aplicativos em execução.
+- Arraste os ícones da barra para mudar a ordem. Clique com o botão direito em um ícone ou na barra para ver as opções.
+- Duração da animação ao aparecer e sumir, de 0 (instantâneo) a 1 segundo.
 - Troca de perfil pela barra de menus, Control + Option + 1 a 9 ou Command + rolagem sobre a barra.
 - Widgets de relógio, data, foco, bateria, notas, memória e carga do sistema, cronômetro, relógio mundial e hidratação.
 - Posição embaixo, à esquerda ou à direita, tamanho dos ícones, aparência e ocultação automática.
@@ -36,12 +42,12 @@ Requisitos:
 Depois de obter o código, execute na pasta do projeto:
 
 ```sh
-git clone https://github.com/guilhermelippert/dockset-local.git
-cd dockset-local
+git clone https://github.com/guilhermelippert/my-open-dock.git
+cd my-open-dock
 bash scripts/build.sh
 ```
 
-O aplicativo será criado em `build/Dockset Local.app`. Para instalá-lo em `~/Applications`:
+O aplicativo será criado em `build/My Open Dock.app`. Para instalá-lo em `~/Applications`:
 
 ```sh
 bash scripts/build.sh --install
@@ -50,24 +56,24 @@ bash scripts/build.sh --install
 O instalador preserva uma cópia da versão anterior na pasta `build`, caso ela exista. Compilar e instalar não abre o aplicativo. Para abri-lo:
 
 ```sh
-open "$HOME/Applications/Dockset Local.app"
+open "$HOME/Applications/My Open Dock.app"
 ```
 
 O script atual compila somente para `arm64`.
 
 ## Usar
 
-O ícone do aplicativo fica na barra de menus. Abra **Gerenciar Docks…** para editar perfis, adicionar itens e configurar a barra. Fechar o editor mantém a barra funcionando. Para encerrar o aplicativo, escolha **Sair do Dockset Local** no menu.
+O ícone do aplicativo fica na barra de menus. Abra **Gerenciar Docks…** para editar perfis, adicionar itens e configurar a barra. Fechar o editor mantém a barra funcionando. Para encerrar o aplicativo, escolha **Sair do My Open Dock** no menu.
 
 Em **Aparência**, você pode ocultar a barra e escolher se o aplicativo deve iniciar com a sessão. O início automático depende do registro permitido pelo macOS.
 
 **Usar configuração do meu Dock** cria ou atualiza o perfil **Meu Dock** com os apps e pastas fixados no Dock da Apple, na mesma ordem, e copia tamanho dos ícones, posição e ocultação automática. Seus outros perfis continuam disponíveis. O Dock da Apple é apenas consultado.
 
-Com **Ocultar automaticamente** ligado, a barra desaparece ao afastar o ponteiro e reaparece ao encostar na borda da tela. A opção também está no menu de perfis da própria barra.
+Com **Ocultar automaticamente** ligado, a barra desaparece ao afastar o ponteiro e reaparece ao encostar na borda da tela. Em **Animação ao aparecer**, escolha quanto tempo ela leva para surgir e sumir. Com 0, é instantâneo. A opção de ocultar também está no menu de perfis e no clique direito da barra.
 
 ## Dados e backups
 
-Os perfis ficam em `~/Library/Application Support/DocksetLocal/state.json`. Notas e preferências dos widgets usam o domínio local `local.gui.DocksetLocal` e entram nos backups exportados.
+Os nomes internos (`DocksetLocal`, `local.gui.DocksetLocal`) ficam do nome antigo do projeto, para não perder dados de quem já usava. Os perfis ficam em `~/Library/Application Support/DocksetLocal/state.json`. Notas e preferências dos widgets usam o domínio local `local.gui.DocksetLocal` e entram nos backups exportados.
 
 Importar um backup substitui os perfis e preferências atuais. Exporte antes se quiser preservá-los. O ponto de restauração do Dock da Apple permanece específico de cada Mac, mesmo ao importar um backup de outra máquina.
 
@@ -98,7 +104,7 @@ O layout compacto e a separação entre apps e pastas também são verificados:
 ```sh
 xcrun swiftc -swift-version 5 -target arm64-apple-macosx14.0 \
   Sources/DocksetLocal/Core.swift Sources/DocksetLocal/DockBarSizing.swift \
-  Tests/DockLayoutSmoke.swift -o /tmp/dockset-layout-smoke
+  Sources/DocksetLocal/Widgets.swift Tests/DockLayoutSmoke.swift -o /tmp/dockset-layout-smoke
 /tmp/dockset-layout-smoke
 ```
 

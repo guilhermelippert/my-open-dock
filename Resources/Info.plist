@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
-<key>CFBundleName</key><string>Dockset Local</string>
-<key>CFBundleDisplayName</key><string>Dockset Local</string>
+<key>CFBundleName</key><string>My Open Dock</string>
+<key>CFBundleDisplayName</key><string>My Open Dock</string>
 <key>CFBundleIdentifier</key><string>local.gui.DocksetLocal</string>
 <key>CFBundleExecutable</key><string>DocksetLocal</string>
 <key>CFBundlePackageType</key><string>APPL</string>
-<key>CFBundleShortVersionString</key><string>1.1.0</string>
-<key>CFBundleVersion</key><string>2</string>
+<key>CFBundleShortVersionString</key><string>1.2.0</string>
+<key>CFBundleVersion</key><string>3</string>
 <key>LSMinimumSystemVersion</key><string>14.0</string>
 <key>LSUIElement</key><true/>
 <key>NSHighResolutionCapable</key><true/>
 <key>CFBundleIconFile</key><string>AppIcon</string>
-<key>NSHumanReadableCopyright</key><string>Versão local independente, inspirada no Dockset.</string>
+<key>NSHumanReadableCopyright</key><string>Projeto pessoal open source, inspirado no Dockset.</string>
 </dict></plist>

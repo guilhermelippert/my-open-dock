@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
-APP_NAME="Dockset Local"
+APP_NAME="My Open Dock"
 BUILD_DIR="$PWD/build"
 APP_DIR="$BUILD_DIR/$APP_NAME.app"
 mkdir -p "$APP_DIR/Contents/MacOS" "$APP_DIR/Contents/Resources"
