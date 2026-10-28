@@ -21,6 +21,7 @@ O aplicativo usa assinatura local ad hoc, sem Developer ID ou notarização da A
 - Perfis de Dock com aplicativos, arquivos, pastas, links, Atalhos do macOS e espaçadores.
 - Barra flutuante com itens fixados e aplicativos em execução.
 - Arraste os ícones da barra para mudar a ordem. Clique com o botão direito em um ícone ou na barra para ver as opções.
+- Substitui o Dock da Apple enquanto está ativo, e devolve as configurações dele ao sair.
 - Duração da animação ao aparecer e sumir, de 0 (instantâneo) a 1 segundo.
 - Troca de perfil pela barra de menus, Control + Option + 1 a 9 ou Command + rolagem sobre a barra.
 - Widgets de relógio, data, foco, bateria, notas, memória e carga do sistema, cronômetro, relógio mundial e hidratação.
@@ -70,6 +71,12 @@ Em **Aparência**, você pode ocultar a barra e escolher se o aplicativo deve in
 **Usar configuração do meu Dock** cria ou atualiza o perfil **Meu Dock** com os apps e pastas fixados no Dock da Apple, na mesma ordem, e copia tamanho dos ícones, posição e ocultação automática. Seus outros perfis continuam disponíveis. O Dock da Apple é apenas consultado.
 
 Com **Ocultar automaticamente** ligado, a barra desaparece ao afastar o ponteiro e reaparece ao encostar na borda da tela. Em **Animação ao aparecer**, escolha quanto tempo ela leva para surgir e sumir. Com 0, é instantâneo. A opção de ocultar também está no menu de perfis e no clique direito da barra.
+
+Com **Substituir o Dock do macOS** ligado (padrão), o Dock da Apple fica escondido enquanto a barra estiver ativa. O macOS não deixa um app remover o Dock, então o app liga a ocultação automática dele com um atraso de 1000 segundos, para que ele nunca apareça. As configurações originais ficam salvas e voltam ao desligar a opção, ocultar a barra ou sair do app. Se o app fechar com erro, elas voltam na próxima vez que ele abrir. Para restaurar na mão (por exemplo, depois de apagar o app sem sair dele):
+
+```sh
+defaults delete com.apple.dock autohide-delay; killall Dock
+```
 
 ## Dados e backups
 

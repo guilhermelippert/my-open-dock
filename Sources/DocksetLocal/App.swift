@@ -50,7 +50,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         observation = store.objectWillChange.debounce(for: .milliseconds(50), scheduler: RunLoop.main).sink { [weak self] _ in
             self?.updateMenu()
             self?.updateLoginSetting()
+            self?.updateNativeDock()
         }
+        updateNativeDock()
         updateMenu()
         registerHotKeys()
         let firstRun = !UserDefaults.standard.bool(forKey: "hasOpenedManager")
@@ -66,6 +68,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        // A duplicate instance quits before creating the bar and must leave the Dock alone.
+        if dockController != nil { NativeDockHider.setHidden(false, dataDirectory: store.dataDirectory) }
         if let keyboardMonitor { NSEvent.removeMonitor(keyboardMonitor) }
         hotKeys.forEach { UnregisterEventHotKey($0) }
         if let hotKeyHandler { RemoveEventHandler(hotKeyHandler) }
@@ -123,6 +127,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         quit.target = self
         menu.addItem(quit)
         statusItem?.menu = menu
+    }
+
+    private func updateNativeDock() {
+        NativeDockHider.setHidden(store.preferences.replaceNativeDock && store.preferences.showDock, dataDirectory: store.dataDirectory)
     }
 
     private func updateLoginSetting() {

@@ -91,9 +91,11 @@ struct DockPreferences: Codable, Equatable {
     var dockScale: Double = 1
     /// Seconds the bar takes to fade in or out. Zero is instant.
     var revealDuration: Double = 0.2
+    /// Hides Apple's Dock while the custom bar is shown.
+    var replaceNativeDock: Bool = true
 
     private enum CodingKeys: String, CodingKey {
-        case edge, iconSize, autoHide, showRunningApps, showDock, launchAtLogin, opacity, dockScale, revealDuration
+        case edge, iconSize, autoHide, showRunningApps, showDock, launchAtLogin, opacity, dockScale, revealDuration, replaceNativeDock
     }
 
     init(edge: DockEdge = .bottom, iconSize: Double = 48, autoHide: Bool = false,
@@ -120,6 +122,7 @@ struct DockPreferences: Codable, Equatable {
         launchAtLogin = try values.decodeIfPresent(Bool.self, forKey: .launchAtLogin) ?? false
         opacity = try values.decodeIfPresent(Double.self, forKey: .opacity) ?? 0.92
         dockScale = try values.decodeIfPresent(Double.self, forKey: .dockScale) ?? 1
+        replaceNativeDock = try values.decodeIfPresent(Bool.self, forKey: .replaceNativeDock) ?? true
         revealDuration = min(max(try values.decodeIfPresent(Double.self, forKey: .revealDuration) ?? 0.2, 0), 1)
     }
 }
